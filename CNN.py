@@ -23,7 +23,6 @@ print(face_data.shape)
 face_data = np.expand_dims(face_data, axis=3)
 
 face_data = face_data.swapaxes(0,2).swapaxes(1,3)
-print(face_data.shape)
 
 # instantiate 4D tensor for input
 input_data = T.tensor4(name='input_data')
@@ -52,7 +51,9 @@ output = T.nnet.sigmoid(conv_out + b.dimshuffle('x', 0, 'x', 'x'))
 # create theano function to compute filtered images
 f = theano.function([input_data], output)
 
-print(f(face_data[:,:,:,:]).shape)
+#print(W.get_value().shape)
+print('Face data shape: ' + str(face_data.shape))
+print('Convolved data shape: ' + str(f(face_data).shape))
 
 #Possibly Pass Faces through Eigen Face Process to get less intricate data and speed up computation
 
