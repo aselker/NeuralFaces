@@ -51,7 +51,8 @@ print('train_names shape: ' + str(len(train_names)))
 face_data = numpy.expand_dims(face_data, axis=3)
 
 face_data = face_data.swapaxes(0,2).swapaxes(1,3)
-batch_size = face_data.shape[0]//24
+#batch_size = face_data.shape[0]//24
+face_count = face_data.shape[0]
 
 #index = T.iscalar('index')#theano.shared(value = 0, name = 'index')
 x = T.dmatrix('x')   # the data is presented as rasterized images
@@ -67,7 +68,7 @@ train_set_x, train_set_y = face_data, train_names
 print('--------------------' + str(train_set_x.shape))
 
 # compute number of minibatches for training, validation and testing
-n_train_batches = train_set_x.shape[0] // batch_size
+#n_train_batches = train_set_x.shape[0] // batch_size
 #n_valid_batches = valid_set_x.get_value(borrow=True).shape[0] // batch_size
 #n_test_batches = test_set_x.get_value(borrow=True).shape[0] // batch_size
 
@@ -79,7 +80,7 @@ print('Building Model')
 # Reshape matrix of rasterized images of shape (batch_size, 28 * 28)
 # to a 4D tensor, compatible with our LeNetConvPoolLayer
 # (28, 28) is the size of MNIST images.
-im_shape = (batch_size, 1, 256, 256)
+im_shape = (face_count, 1, 256, 256)
 layer0_input = x.reshape(im_shape) # get input shape
 
 # Construct the first convolutional pooling layer:
@@ -102,7 +103,7 @@ layer0 = ConvPoolNet(
 layer1 = ConvPoolNet(
     rng,
     input=layer0.output,
-    image_shape=(batch_size, nkerns[0], 128, 128),
+    image_shape=(face_count, nkerns[0], 128, 128),
     filter_shape=(nkerns[1], nkerns[0], 5, 5),
     poolsize=(2, 2)
 )
@@ -118,12 +119,12 @@ layer2 = HiddenLayer(
     rng,
     input=layer2_input,
     n_in=int(nkerns[1] * 256/2/2 * 256/2/2),
-    n_out=batch_size,
+    n_out=face_count,
     activation=T.tanh
 )
 
 # classify the values of the fully-connected sigmoidal layer
-layer3 = LogisticRegression(input=layer2.output, n_in=batch_size, n_out=10)
+layer3 = LogisticRegression(input=layer2.output, n_in=face_count n_out=10)
 
 # the cost we minimize during training is the NLL of the model
 cost = layer3.negative_log_likelihood(y) ## Add Regularization
