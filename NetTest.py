@@ -10,6 +10,7 @@ import timeit
 
 learning_rate = .01
 reg = 1e-5
+#trainsteps = 15
 rng = numpy.random.RandomState(55764)
 nkerns = (2,4)
 
@@ -50,10 +51,10 @@ print('train_names shape: ' + str(len(train_names)))
 face_data = numpy.expand_dims(face_data, axis=3)
 
 face_data = face_data.swapaxes(0,2).swapaxes(1,3)
-batch_size = face_data.shape[0]
+batch_size = face_data.shape[0]//24
 
-index = T.lscalar()
-x = T.matrix('x')   # the data is presented as rasterized images
+index = T.iscalar('index')#theano.shared(value = 0, name = 'index')
+x = T.dmatrix('x')   # the data is presented as rasterized images
 y = T.ivector('y')  # the labels are presented as 1D vector of
                     # [int] labels
 
@@ -63,6 +64,7 @@ y = T.ivector('y')  # the labels are presented as 1D vector of
 train_set_x, train_set_y = face_data, train_names
 #valid_set_x, valid_set_y = datasets[1]
 #test_set_x, test_set_y = datasets[2]
+print('--------------------' + str(train_set_x.shape))
 
 # compute number of minibatches for training, validation and testing
 n_train_batches = train_set_x.shape[0] // batch_size
@@ -72,7 +74,7 @@ n_train_batches = train_set_x.shape[0] // batch_size
 ######################
 # BUILD ACTUAL MODEL #
 ######################
-print('... building the model')
+print('Building Model')
 
 # Reshape matrix of rasterized images of shape (batch_size, 28 * 28)
 # to a 4D tensor, compatible with our LeNetConvPoolLayer
@@ -126,6 +128,8 @@ layer3 = LogisticRegression(input=layer2.output, n_in=batch_size, n_out=10)
 # the cost we minimize during training is the NLL of the model
 cost = layer3.negative_log_likelihood(y) ## Add Regularization
 
+print("Building Functions")
+
 # create a function to compute the mistakes that are made by the model
 """test_model = theano.function(
     [index],
@@ -161,8 +165,10 @@ updates = [
     for param_i, grad_i in zip(params, grads)
 ]
 
+#print(type(int(index)))
+
 train_model = theano.function(
-    [index],
+    [x,y],
     cost,
     updates=updates,
     givens={
@@ -170,3 +176,12 @@ train_model = theano.function(
         y: train_set_y[index * batch_size: (index + 1) * batch_size]
     }
 )
+
+print("Training")
+
+for i in range(10):
+    index.set_value(index.get_value()+1)
+    cost = train_model(i)
+    print('Cost = ' + str(cost))
+
+print("Done")
