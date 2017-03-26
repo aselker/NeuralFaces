@@ -55,7 +55,7 @@ face_data = face_data.swapaxes(0,2).swapaxes(1,3)
 face_count = face_data.shape[0]
 
 #index = T.iscalar('index')#theano.shared(value = 0, name = 'index')
-x = T.dmatrix('x')   # the data is presented as rasterized images
+x = T.tensor4('x')   # the data is presented as rasterized images
 y = T.ivector('y')  # the labels are presented as 1D vector of
                     # [int] labels
 
@@ -182,7 +182,7 @@ print("Training")
 
 for i in range(10):
     #index.set_value(index.get_value()+1)
-    cost = train_model(train_set_x[0, 0, :, :], train_set_y)
+    cost = train_model(train_set_x, train_set_y)
     print('Cost = ' + str(cost))
 
 print("Done")
