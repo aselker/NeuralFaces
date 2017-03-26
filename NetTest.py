@@ -103,7 +103,7 @@ layer0 = ConvPoolNet(
 layer1 = ConvPoolNet(
     rng,
     input=layer0.output,
-    image_shape=(face_count, nkerns[0], 128, 128),
+    image_shape=(face_count, nkerns[0], 123, 123),
     filter_shape=(nkerns[1], nkerns[0], 5, 5),
     poolsize=(2, 2)
 )
@@ -118,13 +118,13 @@ layer2_input = layer1.output.flatten(2)
 layer2 = HiddenLayer(
     rng,
     input=layer2_input,
-    n_in=int(nkerns[1] * 256/2/2 * 256/2/2),
+    n_in=int(nkerns[1] * ((256-10)/2-5)/2 * ((256-10)/2-5)/2),
     n_out=face_count,
     activation=T.tanh
 )
 
 # classify the values of the fully-connected sigmoidal layer
-layer3 = LogisticRegression(input=layer2.output, n_in=face_count n_out=10)
+layer3 = LogisticRegression(input=layer2.output, n_in=face_count, n_out=40)
 
 # the cost we minimize during training is the NLL of the model
 cost = layer3.negative_log_likelihood(y) ## Add Regularization
@@ -132,14 +132,10 @@ cost = layer3.negative_log_likelihood(y) ## Add Regularization
 print("Building Functions")
 
 # create a function to compute the mistakes that are made by the model
-"""test_model = theano.function(
-    [index],
+test_model = theano.function(
+    [x,y],
     layer3.errors(y),
-    givens={
-        x: test_set_x[index * batch_size: (index + 1) * batch_size],
-        y: test_set_y[index * batch_size: (index + 1) * batch_size]
-    }
-)"""
+)
 
 """validate_model = theano.function(
     [index],
@@ -180,9 +176,14 @@ train_model = theano.function(
 
 print("Training")
 
-for i in range(10):
+for i in range(20):
     #index.set_value(index.get_value()+1)
     cost = train_model(train_set_x, train_set_y)
     print('Cost = ' + str(cost))
+
+print("\nPredicting\n")
+
+predict = test_model(train_set_x, train_set_y)
+print(1-predict)
 
 print("Done")
