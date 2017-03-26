@@ -53,7 +53,7 @@ face_data = numpy.expand_dims(face_data, axis=3)
 face_data = face_data.swapaxes(0,2).swapaxes(1,3)
 batch_size = face_data.shape[0]//24
 
-index = T.iscalar('index')#theano.shared(value = 0, name = 'index')
+#index = T.iscalar('index')#theano.shared(value = 0, name = 'index')
 x = T.dmatrix('x')   # the data is presented as rasterized images
 y = T.ivector('y')  # the labels are presented as 1D vector of
                     # [int] labels
@@ -151,6 +151,9 @@ print("Building Functions")
 
 # create a list of all model parameters to be fit by gradient descent
 params = layer3.params + layer2.params + layer1.params + layer0.params
+print('layer0:')
+print(type(layer0.params))
+print(layer0.params[0].get_value().shape)
 
 # create a list of gradients for all model parameters
 grads = T.grad(cost, params)
@@ -160,10 +163,7 @@ grads = T.grad(cost, params)
 # manually create an update rule for each model parameter. We thus
 # create the updates list by automatically looping over all
 # (params[i], grads[i]) pairs.
-updates = [
-    (param_i, param_i - learning_rate * grad_i)
-    for param_i, grad_i in zip(params, grads)
-]
+updates = [(param_i, param_i - learning_rate * grad_i) for param_i, grad_i in zip(params, grads)]
 
 #print(type(int(index)))
 
@@ -171,17 +171,17 @@ train_model = theano.function(
     [x,y],
     cost,
     updates=updates,
-    givens={
-        x: train_set_x[index * batch_size: (index + 1) * batch_size],
-        y: train_set_y[index * batch_size: (index + 1) * batch_size]
-    }
+    #givens={
+    #    x: train_set_x[index * batch_size: (index + 1) * batch_size],
+    #    y: train_set_y[index * batch_size: (index + 1) * batch_size]
+    #}
 )
 
 print("Training")
 
 for i in range(10):
-    index.set_value(index.get_value()+1)
-    cost = train_model(i)
+    #index.set_value(index.get_value()+1)
+    cost = train_model(train_set_x[0, 0, :, :], train_set_y)
     print('Cost = ' + str(cost))
 
 print("Done")
