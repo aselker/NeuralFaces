@@ -1,6 +1,8 @@
 import scipy.io
 import numpy
 import theano
+import scipy.misc
+from matplotlib import pyplot as plt
 from theano import tensor as T
 from theano.tensor.nnet import conv2d
 from theano.tensor.signal import pool
@@ -8,9 +10,9 @@ from NetworkClasses import ConvPoolNet, HiddenLayer, LogisticRegression
 import timeit
 #import random
 
-learning_rate = .01
+learning_rate = .1
 reg = 1e-5
-#trainsteps = 15
+trainsteps = 3
 rng = numpy.random.RandomState(55764)
 nkerns = (2,4)
 
@@ -92,7 +94,7 @@ layer0 = ConvPoolNet(
     rng,
     input=layer0_input,
     image_shape=im_shape,
-    filter_shape=(nkerns[0], 1, 10, 10),
+    filter_shape=(nkerns[0], 1, 20, 20),
     poolsize=(2, 2)
 )
 
@@ -103,8 +105,8 @@ layer0 = ConvPoolNet(
 layer1 = ConvPoolNet(
     rng,
     input=layer0.output,
-    image_shape=(face_count, nkerns[0], 123, 123),
-    filter_shape=(nkerns[1], nkerns[0], 5, 5),
+    image_shape=(face_count, nkerns[0], (256-20)//2, (256-20)//2),
+    filter_shape=(nkerns[1], nkerns[0], 10, 10),
     poolsize=(2, 2)
 )
 
@@ -118,7 +120,7 @@ layer2_input = layer1.output.flatten(2)
 layer2 = HiddenLayer(
     rng,
     input=layer2_input,
-    n_in=int(nkerns[1] * ((256-10)/2-5)/2 * ((256-10)/2-5)/2),
+    n_in=int(nkerns[1] * ((256-20)//2-10)//2 * ((256-20)//2-10)//2),
     n_out=face_count,
     activation=T.tanh
 )
@@ -166,7 +168,7 @@ updates = [(param_i, param_i - learning_rate * grad_i) for param_i, grad_i in zi
 
 train_model = theano.function(
     [x,y],
-    cost,
+    [layer0.W[0][0],cost],
     updates=updates,
     #givens={
     #    x: train_set_x[index * batch_size: (index + 1) * batch_size],
@@ -175,11 +177,12 @@ train_model = theano.function(
 )
 
 print("Training")
-
-for i in range(20):
+kernel = 0
+for i in range(trainsteps):
     #index.set_value(index.get_value()+1)
-    cost = train_model(train_set_x, train_set_y)
+    kernel, cost = train_model(train_set_x, train_set_y)
     print('Cost = ' + str(cost))
+    scipy.misc.imsave('kernel'+str(i)+'.png', kernel)
 
 print("\nPredicting\n")
 
