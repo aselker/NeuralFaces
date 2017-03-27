@@ -8,12 +8,13 @@ from theano.tensor.nnet import conv2d
 from theano.tensor.signal import pool
 from NetworkClasses import ConvPoolNet, HiddenLayer, LogisticRegression
 import timeit
+from math import ceil, floor
 #import random
 
-learning_rate = .03
-reg = 1e-5
-trainsteps = 5
-rng = numpy.random.RandomState(945)
+learning_rate = .004
+reg = .002
+trainsteps = 20
+rng = numpy.random.RandomState(6940)
 nkerns = (2,4)
 face_count = 40
 
@@ -123,9 +124,9 @@ print('test_names_hard shape: ' + str(len(test_names_hard)))
 
 
 # Change Faces to 4D Tensor
-faces_test_hard = numpy.expand_dims(faces_test_easy, axis=3)
+faces_test_hard = numpy.expand_dims(faces_test_hard, axis=3)
 
-faces_test_hard = faces_test_easy.swapaxes(0,2).swapaxes(1,3)
+faces_test_hard = faces_test_hard.swapaxes(0,2).swapaxes(1,3)
 
 #########################################
 
@@ -171,7 +172,7 @@ layer0 = ConvPoolNet(
     input=layer0_input,
     image_shape=im_shape,
     filter_shape=(nkerns[0], 1, 10, 10),
-    poolsize=(2, 2)
+    poolsize=(4, 4)
 )
 
 # Construct the second convolutional pooling layer
@@ -181,9 +182,9 @@ layer0 = ConvPoolNet(
 layer1 = ConvPoolNet(
     rng,
     input=layer0.output,
-    image_shape=(face_count, nkerns[0], (256-10)//2, (256-10)//2),
+    image_shape=(face_count, nkerns[0], floor((256-10)/4), floor((256-10)/4)),
     filter_shape=(nkerns[1], nkerns[0], 5, 5),
-    poolsize=(2, 2)
+    poolsize=(4, 4)
 )
 
 # the HiddenLayer being fully-connected, it operates on 2D matrices of
@@ -196,7 +197,7 @@ layer2_input = layer1.output.flatten(2)
 layer2 = HiddenLayer(
     rng,
     input=layer2_input,
-    n_in=int(nkerns[1] * ((256-10)//2-5)//2 * ((256-10)//2-5)//2),
+    n_in=int(nkerns[1] * floor((floor((256-10)/4)-5)/4) * floor((floor((256-10)/4)-5)/4)),
     n_out=face_count,
     activation=T.tanh
 )
@@ -204,8 +205,14 @@ layer2 = HiddenLayer(
 # classify the values of the fully-connected sigmoidal layer
 layer3 = LogisticRegression(input=layer2.output, n_in=face_count, n_out=40)
 
+# create a list of all model parameters to be fit by gradient descent
+params = layer3.params + layer2.params + layer1.params + layer0.params
+#print('layer0:')
+#print(type(layer0.params))
+#print(layer0.params[0].get_value().shape)
+
 # the cost we minimize during training is the NLL of the model
-cost = layer3.negative_log_likelihood(y) ## Add Regularization
+cost = layer3.negative_log_likelihood(y) + reg*T.sum(layer3.params[0]*layer3.params[0]) + reg*T.sum(layer2.params[0]*layer2.params[0]) + reg*T.sum(layer1.params[0]*layer1.params[0]) + reg*T.sum(layer0.params[0]*layer0.params[0])
 
 print("Building Functions")
 
@@ -224,12 +231,6 @@ test_model = theano.function(
     }
 )"""
 
-# create a list of all model parameters to be fit by gradient descent
-params = layer3.params + layer2.params + layer1.params + layer0.params
-#print('layer0:')
-#print(type(layer0.params))
-#print(layer0.params[0].get_value().shape)
-
 # create a list of gradients for all model parameters
 grads = T.grad(cost, params)
 
@@ -244,7 +245,7 @@ updates = [(param_i, param_i - learning_rate * grad_i) for param_i, grad_i in zi
 
 train_model = theano.function(
     [x,y],
-    [layer0.W[0][0],cost],
+    [layer1.W[0][0],cost],
     updates=updates
     #givens={
     #    x: train_set_x[index * batch_size: (index + 1) * batch_size],
@@ -265,15 +266,36 @@ for i in range(trainsteps):
     print('Cost = ' + str(cost))
     scipy.misc.imsave('kernel'+str(i)+'.png', kernel)
 
-print("\nPredicting\n")
+print("\nPredicting on Training\n")
+
+predict = 0
+calcs = len(train_set_x)//face_count
+for j in range(calcs):
+    #index.set_value(index.get_value()+1)
+    res = test_model(train_set_x[j*face_count:(j+1)*face_count], train_set_y[j*face_count:(j+1)*face_count])
+    #print(res)
+    predict += res
+print((calcs-predict)/calcs)
+
+print("\nPredicting Easy\n")
 
 predict = 0
 calcs = len(test_easy_set_x)//face_count
 for j in range(calcs):
     #index.set_value(index.get_value()+1)
-    print(j)
     res = test_model(test_easy_set_x[j*face_count:(j+1)*face_count], test_easy_set_y[j*face_count:(j+1)*face_count])
-    print(res)
+    #print(res)
+    predict += res
+print((calcs-predict)/calcs)
+
+print("\nPredicting Difficult\n")
+
+predict = 0
+calcs = len(test_hard_set_x)//face_count
+for j in range(calcs):
+    #index.set_value(index.get_value()+1)
+    res = test_model(test_hard_set_x[j*face_count:(j+1)*face_count], test_hard_set_y[j*face_count:(j+1)*face_count])
+    #print(res)
     predict += res
 print((calcs-predict)/calcs)
 
