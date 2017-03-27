@@ -10,12 +10,12 @@ from NetworkClasses import ConvPoolNet, HiddenLayer, LogisticRegression
 import timeit
 #import random
 
-learning_rate = 1
+learning_rate = .03
 reg = 1e-5
-trainsteps = 3
-rng = numpy.random.RandomState(55764)
+trainsteps = 5
+rng = numpy.random.RandomState(945)
 nkerns = (2,4)
-face_count = 1
+face_count = 40
 
 #Pull in data from Databases (Larger General Face Data and Class Data)
 mat = scipy.io.loadmat('face_detect.mat')
@@ -132,7 +132,7 @@ faces_test_hard = faces_test_easy.swapaxes(0,2).swapaxes(1,3)
 #batch_size = face_data.shape[0]//2
 
 #index = T.iscalar('index')#theano.shared(value = 0, name = 'index')
-x = T.matrix('x')   # the data is presented as rasterized images
+x = T.tensor4('x')   # the data is presented as rasterized images
 y = T.lvector('y')  # the labels are presented as 1D vector of
                     # [int] labels
 #face_count = x.shape[0]
@@ -261,17 +261,20 @@ for i in range(trainsteps):
         #index.set_value(index.get_value()+1)
         #print(train_set_x[j*face_count:(j+1)*face_count].shape)
         #print(train_set_x[j][0].shape)
-        kernel, cost = train_model(train_set_x[j][0], numpy.expand_dims(train_set_y[j],axis=0))#train_model(train_set_x[j*face_count:(j+1)*face_count], train_set_y[j*face_count:(j+1)*face_count])
+        kernel, cost = train_model(train_set_x[j*face_count:(j+1)*face_count], train_set_y[j*face_count:(j+1)*face_count])
     print('Cost = ' + str(cost))
     scipy.misc.imsave('kernel'+str(i)+'.png', kernel)
 
 print("\nPredicting\n")
 
-predict = []
-for j in range(len(test_easy_set_x)):
+predict = 0
+calcs = len(test_easy_set_x)//face_count
+for j in range(calcs):
     #index.set_value(index.get_value()+1)
     print(j)
-    predict.append(test_model(test_easy_set_x[j][0], numpy.expand_dims(test_easy_set_y[j],axis=0)))
-print("%i/%i"%(len(predict)-sum(predict),len(predict)))
+    res = test_model(test_easy_set_x[j*face_count:(j+1)*face_count], test_easy_set_y[j*face_count:(j+1)*face_count])
+    print(res)
+    predict += res
+print((calcs-predict)/calcs)
 
 print("Done")
