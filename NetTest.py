@@ -10,11 +10,12 @@ from NetworkClasses import ConvPoolNet, HiddenLayer, LogisticRegression
 import timeit
 #import random
 
-learning_rate = .1
+learning_rate = 1
 reg = 1e-5
 trainsteps = 3
 rng = numpy.random.RandomState(55764)
 nkerns = (2,4)
+face_count = 1
 
 #Pull in data from Databases (Larger General Face Data and Class Data)
 mat = scipy.io.loadmat('face_detect.mat')
@@ -53,20 +54,95 @@ print('train_names shape: ' + str(len(train_names)))
 face_data = numpy.expand_dims(face_data, axis=3)
 
 face_data = face_data.swapaxes(0,2).swapaxes(1,3)
-#batch_size = face_data.shape[0]//24
-face_count = face_data.shape[0]
+
+############################################# GET TEST DATA
+faces_test_easy = mat['faces_test_easy']
+names_test_easy = mat['names_test_easy']
+faces_test_hard = mat['faces_test_hard']
+names_test_hard = mat['names_test_hard']
+test_names_easy = names_test_easy
+
+rotated_test_names_easy = [['\x00' for i in range(len(test_names_easy))] for j in range(max([len(test_names_easy[i]) for i in range(len(test_names_easy)-1)]))]
+
+for i in range(len(test_names_easy)):
+    for j in range(len(test_names_easy[i])):
+        rotated_test_names_easy[j][i] = test_names_easy[i][j]
+
+new_test_names_easy = [""] * len(rotated_test_names_easy)
+
+for i in range(len(rotated_test_names_easy)):
+    for j in range(len(rotated_test_names_easy[i])):
+        if rotated_test_names_easy[i][j] == '\x00':
+            break
+        else:
+            new_test_names_easy[i] += rotated_test_names_easy[i][j]
+cur = 0
+num = -1
+for i in range(len(new_test_names_easy)): #Use names and convert them all to integer numbers denoting what class they are (each class is a person)
+    if not new_test_names_easy[i] == cur:
+        cur = new_test_names_easy[i]
+        num += 1
+    new_test_names_easy[i] = num
+test_names_easy = new_test_names_easy
+print('test_names_easy shape: ' + str(len(test_names_easy)))
+#print(train_names)
+
+
+# Change Faces to 4D Tensor
+faces_test_easy = numpy.expand_dims(faces_test_easy, axis=3)
+
+faces_test_easy = faces_test_easy.swapaxes(0,2).swapaxes(1,3)
+
+#########################################
+test_names_hard = names_test_hard
+
+rotated_test_names_hard = [['\x00' for i in range(len(test_names_hard))] for j in range(max([len(test_names_hard[i]) for i in range(len(test_names_hard)-1)]))]
+
+for i in range(len(test_names_hard)):
+    for j in range(len(test_names_hard[i])):
+        rotated_test_names_hard[j][i] = test_names_hard[i][j]
+
+new_test_names_hard = [""] * len(rotated_test_names_hard)
+
+for i in range(len(rotated_test_names_hard)):
+    for j in range(len(rotated_test_names_hard[i])):
+        if rotated_test_names_hard[i][j] == '\x00':
+            break
+        else:
+            new_test_names_hard[i] += rotated_test_names_hard[i][j]
+cur = 0
+num = -1
+for i in range(len(new_test_names_hard)): #Use names and convert them all to integer numbers denoting what class they are (each class is a person)
+    if not new_test_names_hard[i] == cur:
+        cur = new_test_names_hard[i]
+        num += 1
+    new_test_names_hard[i] = num
+test_names_hard = new_test_names_hard
+print('test_names_hard shape: ' + str(len(test_names_hard)))
+#print(train_names)
+
+
+# Change Faces to 4D Tensor
+faces_test_hard = numpy.expand_dims(faces_test_easy, axis=3)
+
+faces_test_hard = faces_test_easy.swapaxes(0,2).swapaxes(1,3)
+
+#########################################
+
+#batch_size = face_data.shape[0]//2
 
 #index = T.iscalar('index')#theano.shared(value = 0, name = 'index')
-x = T.tensor4('x')   # the data is presented as rasterized images
-y = T.ivector('y')  # the labels are presented as 1D vector of
+x = T.matrix('x')   # the data is presented as rasterized images
+y = T.lvector('y')  # the labels are presented as 1D vector of
                     # [int] labels
+#face_count = x.shape[0]
 
 #datasets = load_data(dataset)
 
 ### MAKE IT WORK WITH A TESTING EVENTUALLY ###
 train_set_x, train_set_y = face_data, train_names
-#valid_set_x, valid_set_y = datasets[1]
-#test_set_x, test_set_y = datasets[2]
+test_easy_set_x, test_easy_set_y = faces_test_easy, test_names_easy
+test_hard_set_x, test_hard_set_y = faces_test_hard, test_names_hard
 print('--------------------' + str(train_set_x.shape))
 
 # compute number of minibatches for training, validation and testing
@@ -94,7 +170,7 @@ layer0 = ConvPoolNet(
     rng,
     input=layer0_input,
     image_shape=im_shape,
-    filter_shape=(nkerns[0], 1, 20, 20),
+    filter_shape=(nkerns[0], 1, 10, 10),
     poolsize=(2, 2)
 )
 
@@ -105,8 +181,8 @@ layer0 = ConvPoolNet(
 layer1 = ConvPoolNet(
     rng,
     input=layer0.output,
-    image_shape=(face_count, nkerns[0], (256-20)//2, (256-20)//2),
-    filter_shape=(nkerns[1], nkerns[0], 10, 10),
+    image_shape=(face_count, nkerns[0], (256-10)//2, (256-10)//2),
+    filter_shape=(nkerns[1], nkerns[0], 5, 5),
     poolsize=(2, 2)
 )
 
@@ -120,7 +196,7 @@ layer2_input = layer1.output.flatten(2)
 layer2 = HiddenLayer(
     rng,
     input=layer2_input,
-    n_in=int(nkerns[1] * ((256-20)//2-10)//2 * ((256-20)//2-10)//2),
+    n_in=int(nkerns[1] * ((256-10)//2-5)//2 * ((256-10)//2-5)//2),
     n_out=face_count,
     activation=T.tanh
 )
@@ -150,9 +226,9 @@ test_model = theano.function(
 
 # create a list of all model parameters to be fit by gradient descent
 params = layer3.params + layer2.params + layer1.params + layer0.params
-print('layer0:')
-print(type(layer0.params))
-print(layer0.params[0].get_value().shape)
+#print('layer0:')
+#print(type(layer0.params))
+#print(layer0.params[0].get_value().shape)
 
 # create a list of gradients for all model parameters
 grads = T.grad(cost, params)
@@ -169,24 +245,33 @@ updates = [(param_i, param_i - learning_rate * grad_i) for param_i, grad_i in zi
 train_model = theano.function(
     [x,y],
     [layer0.W[0][0],cost],
-    updates=updates,
+    updates=updates
     #givens={
     #    x: train_set_x[index * batch_size: (index + 1) * batch_size],
     #    y: train_set_y[index * batch_size: (index + 1) * batch_size]
     #}
 )
 
+print(train_set_x.shape)
+print(test_easy_set_x.shape)
 print("Training")
 kernel = 0
 for i in range(trainsteps):
-    #index.set_value(index.get_value()+1)
-    kernel, cost = train_model(train_set_x, train_set_y)
+    for j in range(len(train_set_x)//face_count):
+        #index.set_value(index.get_value()+1)
+        #print(train_set_x[j*face_count:(j+1)*face_count].shape)
+        #print(train_set_x[j][0].shape)
+        kernel, cost = train_model(train_set_x[j][0], numpy.expand_dims(train_set_y[j],axis=0))#train_model(train_set_x[j*face_count:(j+1)*face_count], train_set_y[j*face_count:(j+1)*face_count])
     print('Cost = ' + str(cost))
     scipy.misc.imsave('kernel'+str(i)+'.png', kernel)
 
 print("\nPredicting\n")
 
-predict = test_model(train_set_x, train_set_y)
-print(1-predict)
+predict = []
+for j in range(len(test_easy_set_x)):
+    #index.set_value(index.get_value()+1)
+    print(j)
+    predict.append(test_model(test_easy_set_x[j][0], numpy.expand_dims(test_easy_set_y[j],axis=0)))
+print("%i/%i"%(len(predict)-sum(predict),len(predict)))
 
 print("Done")
